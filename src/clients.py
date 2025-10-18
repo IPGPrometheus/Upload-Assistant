@@ -130,8 +130,16 @@ class Clients():
 
             if result:
                 if isinstance(result, dict):
+                    # Got a valid torrent but not ideal piece size
                     best_match = result
+                    # If prefer_small_pieces is False, we don't care about piece size optimization
+                    # so stop searching after finding the first valid torrent
+                    if not prefer_small_pieces:
+                        console.print(f"[green]Found valid torrent in client '{client_name}', stopping search[/green]")
+                        return best_match['torrent_path']
                 else:
+                    # Got a path - this means we found a torrent with ideal piece size
+                    console.print(f"[green]Found valid torrent with preferred piece size in client '{client_name}', stopping search[/green]")
                     return result
 
         if prefer_small_pieces and best_match:
@@ -1901,6 +1909,22 @@ class Clients():
         if meta.get('debug'):
             console.print(f"[yellow]Searching for torrents in qBittorrent for path: {content_path}[/yellow]")
         try:
+            mtv_config = self.config['TRACKERS'].get('MTV')
+            piece_limit = self.config['DEFAULT'].get('prefer_max_16_torrent', False)
+            if isinstance(mtv_config, dict):
+                mtv_torrent = mtv_config.get('prefer_mtv_torrent', False)
+                # MTV preference takes priority as it's more restrictive (8 MiB vs 16 MiB)
+                if mtv_torrent:
+                    piece_size_constraints_enabled = 'MTV'
+                elif piece_limit:
+                    piece_size_constraints_enabled = '16MiB'
+                else:
+                    piece_size_constraints_enabled = False
+            else:
+                piece_size_constraints_enabled = '16MiB' if piece_limit else False
+
+            meta['piece_size_constraints_enabled'] = piece_size_constraints_enabled
+
             # Determine which clients to search
             clients_to_search = []
 
@@ -1943,7 +1967,48 @@ class Clients():
                     console.print(f"[cyan]Searching qBittorrent client: {client_name}")
 
                 torrents = await self._search_single_qbit_client(client_config, content_path, meta, client_name)
-                all_matching_torrents.extend(torrents)
+
+                if torrents:
+                    # Found matching torrents in this client
+                    all_matching_torrents.extend(torrents)
+
+                    # Check if we should stop searching additional clients
+                    found_piece_size = meta.get('found_preferred_piece_size', False)
+                    constraints_enabled = meta.get('piece_size_constraints_enabled', False)
+
+                    should_stop = False
+
+                    if not constraints_enabled:
+                        # No constraints, stop after finding any torrent
+                        should_stop = True
+                        if meta['debug']:
+                            console.print(f"[green]Found {len(torrents)} matching torrent(s) in client '{client_name}' (no piece size constraints), stopping search[/green]")
+                    elif found_piece_size == 'no_constraints':
+                        # Found valid torrent and no constraints were set
+                        should_stop = True
+                        if meta['debug']:
+                            console.print(f"[green]Found {len(torrents)} matching torrent(s) in client '{client_name}', stopping search[/green]")
+                    elif found_piece_size == 'MTV':
+                        # MTV constraint is always satisfied since it's most restrictive
+                        should_stop = True
+                        if meta['debug']:
+                            console.print(f"[green]Found torrent with MTV preferred piece size (≤8 MiB) in client '{client_name}', stopping search[/green]")
+                    elif found_piece_size == '16MiB' and constraints_enabled == '16MiB':
+                        # 16MiB constraint satisfied (and MTV not required)
+                        should_stop = True
+                        if meta['debug']:
+                            console.print(f"[green]Found torrent with 16 MiB piece size in client '{client_name}', stopping search[/green]")
+                    else:
+                        # Constraints enabled but not met, continue searching
+                        if meta['debug']:
+                            constraint_name = "MTV (≤8 MiB)" if constraints_enabled == 'MTV' else "16 MiB"
+                            console.print(f"[yellow]Found {len(torrents)} torrent(s) in client '{client_name}' but no {constraint_name} piece size match, continuing search[/yellow]")
+
+                    if should_stop:
+                        break
+                else:
+                    if meta['debug']:
+                        console.print(f"[yellow]No matching torrents found in client '{client_name}', continuing to next client[/yellow]")
 
             # Deduplicate by hash (in case same torrent exists in multiple clients)
             seen_hashes = set()
@@ -2525,11 +2590,26 @@ class Clients():
                                 meta['base_torrent_created'] = True
                                 meta['hash_used'] = piece_size_best_match['hash']
                                 found_valid_torrent = True
+
+                                # Check if the best match actually meets the piece size constraint
+                                piece_size = piece_size_best_match['piece_size']
+                                if prefer_small_pieces and piece_size <= 8388608:  # 8 MiB
+                                    meta['found_preferred_piece_size'] = 'MTV'
+                                elif piece_limit and piece_size <= 16777216:  # 16 MiB
+                                    meta['found_preferred_piece_size'] = '16MiB'
+                                else:
+                                    # Found a torrent but it doesn't meet the constraint
+                                    meta['found_preferred_piece_size'] = False
                             except Exception as e:
                                 console.print(f"[bold red]Error creating BASE.torrent from best match: {e}")
                         elif use_piece_preference and not piece_size_best_match:
                             console.print("[yellow]No preferred torrents found matching piece size preferences.")
                             meta['we_checked_them_all'] = True
+                            meta['found_preferred_piece_size'] = False
+
+                        # If piece preference is not enabled, set flag to indicate we can stop searching
+                        if not use_piece_preference and found_valid_torrent:
+                            meta['found_preferred_piece_size'] = 'no_constraints'
 
             # Display results summary
             if meta['debug']:

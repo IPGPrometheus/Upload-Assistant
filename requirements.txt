@@ -23,6 +23,7 @@ pycountry
 pyimgbox
 pymediainfo==7.0.1
 pyotp
+pyoxipng
 pyparsebluray
 qbittorrent-api
 requests
@@ -31,6 +32,7 @@ tmdbsimple
 torf
 tqdm
 transmission_rpc
-tvdb-v4-official
 unidecode
 urllib3
+flask>=2.3.0
+flask-cors>=4.0.0

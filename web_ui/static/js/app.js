@@ -240,18 +240,22 @@ function AudionutsUAGUI() {
   }, [isExecuting]);
 
   const sendInput = async () => {
-    if (!userInput.trim() || !sessionId) return;
+    if (!sessionId) return;
 
     const term = xtermRef.current;
-    const inputToSend = userInput;
+    
+    // If input is empty, just send Enter (newline)
+    const inputToSend = userInput.trim() === '' ? '' : userInput;
+    
     setUserInput('');
     
-    // Show what user typed in terminal
-    if (term) {
+    // Show what user typed in terminal (only if not empty)
+    if (term && inputToSend !== '') {
       term.writeln('\x1b[1;36m> ' + inputToSend + '\x1b[0m');
     }
 
     try {
+      // Send the input (empty string sends just Enter)
       await fetch(`${API_BASE}/input`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -571,7 +575,7 @@ function AudionutsUAGUI() {
                 type="text"
                 value={customArgs}
                 onChange={(e) => setCustomArgs(e.target.value)}
-                placeholder="--tracker RED --type flac --source CD"
+                placeholder="--tmdb tv/12345 or movie/12345 --trackers BLU,RED,LST --type flac,movie,tv-show --source CD,PAL, WEB"
                 className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
                   isDarkMode 
                     ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
@@ -580,7 +584,7 @@ function AudionutsUAGUI() {
                 disabled={isExecuting}
               />
               <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
-                Common: --tracker [RED/OPS/etc], --type [flac/mp3], --group [artist], --source [CD/WEB]
+                Common: --tmdb tv/12345 or movie/12345 --trackers BLU,RED,LST --type flac,movie,tv-show --source CD,PAL
               </p>
             </div>
 
@@ -638,7 +642,7 @@ function AudionutsUAGUI() {
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 disabled={!isExecuting}
-                placeholder={isExecuting ? "Type your response and press Enter..." : "Execute a command first"}
+                placeholder={isExecuting ? "Type response and press Enter (or just press Enter to continue)..." : "Execute a command first"}
                 className={`flex-1 px-3 py-2 rounded border focus:border-purple-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed font-mono text-sm ${
                   isDarkMode
                     ? 'bg-gray-900 text-white border-gray-700 placeholder-gray-500'
@@ -647,8 +651,9 @@ function AudionutsUAGUI() {
               />
               <button
                 onClick={sendInput}
-                disabled={!isExecuting || !userInput.trim()}
+                disabled={!isExecuting}
                 className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors flex items-center gap-2 flex-shrink-0"
+                title="Send input (or press Enter on empty input to continue)"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

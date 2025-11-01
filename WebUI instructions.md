@@ -41,7 +41,7 @@ Click the Gear Icon next to the stack name → Edit Stack → Compose File.
 Copy the docker-compose file from the GitHub repo into the compose editor.
 5.1 Update the docker-compose.yml for desired ports (use the left column) and your mount paths.
 <center> <img src="https://i.ibb.co/fGxKcJbP/Picture1.png.png"  
-alt="Docker Compose"  
+alt="Docker Compose"  width=auto
 style="float: left; margin-right: 10px;" /></center>
 
 Click Save Changes.

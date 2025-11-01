@@ -52,11 +52,8 @@ RUN find bin/mkbrr -type f -name "mkbrr" -exec chmod +x {} \;
 RUN mkdir -p /Upload-Assistant/tmp && chmod 777 /Upload-Assistant/tmp
 ENV TMPDIR=/Upload-Assistant/tmp
 
-# Expose Web UI port
-EXPOSE 5000
-
 # Add environment variable to enable/disable Web UI
-ENV ENABLE_WEB_UI=true
+ENV ENABLE_WEB_UI=false
 
 # Make entrypoint script executable
 RUN chmod +x docker-entrypoint.sh

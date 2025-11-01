@@ -6,6 +6,7 @@ This install is for those who want to have the GUI for UA present on their syste
 **Standard Installation**
 
 Git clone the repo to your desired folder.
+
 1.1 If you already have a config.py — copy it into your Upload-Assistant/data/* folder.
 
 Update your docker-compose.yml file for desired ports (use the left side) and your desired mounting paths.
